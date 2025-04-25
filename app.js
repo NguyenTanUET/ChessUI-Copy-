@@ -22,6 +22,7 @@ let game = {
 };
 let moveHistory = [];
 let moveList = GenerateMoves(game.GameState);
+
 console.log(moveList);
 
 // Khởi tạo engine
@@ -108,8 +109,11 @@ function movePiece(fromPos, toPos) {
     // Cập nhật lịch sử nước đi
     const move = fromPos + toPos;
     moveHistory.push(move);
+    console.log("MOVE BEFORE CONVERT HISTORY: " + move);
 
-    let moveConverted = GenerateMoves(game.GameState).moves.find(e => (e & 0xfff) === MakeMove(fromPos, toPos, 0));
+    // let moveConverted = GenerateMoves(game.GameState).moves.find(e => (e & 0xfff) === MakeMove(fromPos, toPos, 0));
+    let moveConverted = AlgebraicToMove(move, GenerateMoves(game.GameState));
+    console.log("MOVE CONVERTED: " + moveConverted);
 
     // Cập nhật trạng thái game
     game.GameState = ExecuteMove(game.GameState, moveConverted);
@@ -127,6 +131,7 @@ function executeAIMove(move) {
     console.log('Bot moves:', move);
     let convertedMove = AlgebraicToMove(move, GenerateMoves(game.GameState));
     // Get the from and to positions
+    console.log("CONVERTEED MOVE: " + convertedMove);
     const fromPos = move.substring(0, 2);
     const toPos = move.substring(2, 4);
 
@@ -142,6 +147,7 @@ function executeAIMove(move) {
     // Update the game state
     moveHistory.push(move);
     game.GameState = ExecuteMove(game.GameState, convertedMove);
+    PrintGameState(game.GameState);
 
 }
 
@@ -194,4 +200,3 @@ function getAIMove() {
     sendCommand('go depth 5');
     console.log(positionCommand);
 }
-
