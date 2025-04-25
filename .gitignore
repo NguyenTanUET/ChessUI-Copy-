@@ -1,0 +1,3 @@
+# Ignore thư mục node_modules và file cấu hình IDE
+node_modules/
+.idea/
