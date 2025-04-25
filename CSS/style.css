@@ -1,0 +1,36 @@
+@font-face {
+    font-family: 'Merida';
+    src: url('https://cdn.jsdelivr.net/gh/lichess-org/lila/fonts/merida/merida.ttf') format('truetype');
+}
+body {
+    margin: 0;
+    padding: 0;
+    background: #312e2b;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: 'Merida', sans-serif;
+}
+.chessboard {
+    display: grid;
+    grid-template: repeat(8,80px) / repeat(8,80px);
+    border: 2px solid #222;
+}
+.square {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 56px;
+    cursor: pointer;
+    user-select: none;
+}
+.white { background: #f0d9b5; }
+.black { background: #b58863; }
+.square.highlight::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,0,0.4);
+}

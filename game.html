@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bàn cờ kiểu Lichess với highlight nước đi</title>
+  <style>
+    @font-face {
+      font-family: 'Merida';
+      src: url('https://cdn.jsdelivr.net/gh/lichess-org/lila/fonts/merida/merida.ttf') format('truetype');
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #312e2b;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: 'Merida', sans-serif;
+    }
+    .chessboard {
+      display: grid;
+      grid-template-columns: repeat(8, 80px);
+      grid-template-rows: repeat(8, 80px);
+      border: 2px solid #222;
+    }
+    .square {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 56px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .white { background-color: #f0d9b5; }
+    .black { background-color: #b58863; }
+    /* highlight overlay */
+    .square.highlight::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255, 255, 0, 0.4);
+    }
+  </style>
+</head>
+<body>
+<div class="chessboard" id="chessboard"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
