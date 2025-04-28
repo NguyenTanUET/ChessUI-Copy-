@@ -22,7 +22,6 @@ let game = {
 };
 let moveHistory = [];
 let moveList = GenerateMoves(game.GameState);
-
 console.log(moveList);
 
 // Khởi tạo engine
@@ -90,9 +89,8 @@ function showHighlights(pos) {
     });
 }
 
-// Thêm hàm di chuyển quân cờ và cập nhật DOM
+// Cập nhật hàm movePiece đã có để hỗ trợ castling
 function movePiece(fromPos, toPos) {
-
     if (game.GameState.SideToMove !== 0) {
         console.log('Not white\'s turn yet!');
         return;
@@ -103,35 +101,41 @@ function movePiece(fromPos, toPos) {
 
     if (!fromSq || !toSq) return;
 
-    toSq.textContent = fromSq.textContent;
-    fromSq.textContent = '';
-
     // Cập nhật lịch sử nước đi
     const move = fromPos + toPos;
     moveHistory.push(move);
-    console.log("MOVE BEFORE CONVERT HISTORY: " + move);
 
-    // let moveConverted = GenerateMoves(game.GameState).moves.find(e => (e & 0xfff) === MakeMove(fromPos, toPos, 0));
     let moveConverted = AlgebraicToMove(move, GenerateMoves(game.GameState));
-    console.log("MOVE CONVERTED: " + moveConverted);
 
     // Cập nhật trạng thái game
     game.GameState = ExecuteMove(game.GameState, moveConverted);
+
+    // Xử lý castling
+    const isCastling = handleCastling(fromPos, toPos);
+
+    if (!isCastling) {
+        // Normal move
+        toSq.textContent = fromSq.textContent;
+        fromSq.textContent = '';
+    }
+
     PrintGameState(game.GameState);
+
     // Reset selection và highlight
     selectedPos = null;
     clearHighlights();
+
     // Sau khi người chơi di chuyển, gọi bot
     getAIMove();
-
 }
 
+
+// Thực hiện nước đi của AI
 // Thực hiện nước đi của AI
 function executeAIMove(move) {
     console.log('Bot moves:', move);
     let convertedMove = AlgebraicToMove(move, GenerateMoves(game.GameState));
     // Get the from and to positions
-    console.log("CONVERTEED MOVE: " + convertedMove);
     const fromPos = move.substring(0, 2);
     const toPos = move.substring(2, 4);
 
@@ -139,16 +143,70 @@ function executeAIMove(move) {
     const fromSq = document.querySelector(`.square[data-pos="${fromPos}"]`);
     const toSq = document.querySelector(`.square[data-pos="${toPos}"]`);
 
-    if (fromSq && toSq) {
+    if (!fromSq || !toSq) return;
+
+    // Cập nhật trạng thái game trước khi cập nhật DOM
+    moveHistory.push(move);
+    game.GameState = ExecuteMove(game.GameState, convertedMove);
+
+    // Xử lý castling
+    const isCastling = handleCastling(fromPos, toPos);
+
+    if (!isCastling) {
+        // Normal move
         toSq.textContent = fromSq.textContent;
         fromSq.textContent = '';
     }
 
-    // Update the game state
-    moveHistory.push(move);
-    game.GameState = ExecuteMove(game.GameState, convertedMove);
     PrintGameState(game.GameState);
+}
 
+// Hàm xử lý castling
+function handleCastling(fromPos, toPos) {
+    // Xác định nước đi castling
+    const isWhiteKingside = (fromPos === 'e1' && toPos === 'g1');
+    const isWhiteQueenside = (fromPos === 'e1' && toPos === 'c1');
+    const isBlackKingside = (fromPos === 'e8' && toPos === 'g8');
+    const isBlackQueenside = (fromPos === 'e8' && toPos === 'c8');
+
+    if (isWhiteKingside) {
+        // Di chuyển vua
+        document.querySelector(`.square[data-pos="g1"]`).textContent = '♔';
+        document.querySelector(`.square[data-pos="e1"]`).textContent = '';
+        // Di chuyển xe
+        document.querySelector(`.square[data-pos="f1"]`).textContent = '♖';
+        document.querySelector(`.square[data-pos="h1"]`).textContent = '';
+        return true;
+    }
+    else if (isWhiteQueenside) {
+        // Di chuyển vua
+        document.querySelector(`.square[data-pos="c1"]`).textContent = '♔';
+        document.querySelector(`.square[data-pos="e1"]`).textContent = '';
+        // Di chuyển xe
+        document.querySelector(`.square[data-pos="d1"]`).textContent = '♖';
+        document.querySelector(`.square[data-pos="a1"]`).textContent = '';
+        return true;
+    }
+    else if (isBlackKingside) {
+        // Di chuyển vua
+        document.querySelector(`.square[data-pos="g8"]`).textContent = '♚';
+        document.querySelector(`.square[data-pos="e8"]`).textContent = '';
+        // Di chuyển xe
+        document.querySelector(`.square[data-pos="f8"]`).textContent = '♜';
+        document.querySelector(`.square[data-pos="h8"]`).textContent = '';
+        return true;
+    }
+    else if (isBlackQueenside) {
+        // Di chuyển vua
+        document.querySelector(`.square[data-pos="c8"]`).textContent = '♚';
+        document.querySelector(`.square[data-pos="e8"]`).textContent = '';
+        // Di chuyển xe
+        document.querySelector(`.square[data-pos="d8"]`).textContent = '♜';
+        document.querySelector(`.square[data-pos="a8"]`).textContent = '';
+        return true;
+    }
+
+    return false;
 }
 
 // Sửa phần xử lý click
@@ -200,3 +258,4 @@ function getAIMove() {
     sendCommand('go depth 5');
     console.log(positionCommand);
 }
+
