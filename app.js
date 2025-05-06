@@ -201,10 +201,47 @@ function movePiece(fromPos, toPos) {
 }
 
 // Function to reset the board UI
+// Function to reset the board UI
 function resetBoard() {
-    // Setup the board with animated pieces
-    setupPiecesSystem();
+    console.log("Resetting the board UI");
+
+    // First clear all squares
+    squares.forEach(sq => {
+        sq.textContent = '';
+        // Ensure each square still has the chess-square class
+        sq.classList.add('chess-square');
+    });
+
+    // Clear any existing pieces
+    const existingPieces = document.querySelectorAll('.chess-piece');
+    existingPieces.forEach(piece => piece.remove());
+
+    // Now add pieces based on initial positions
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            let rc = r;
+            let cc = c;
+            if (playerColor === 1) {
+                rc = 7 - r;
+                cc = 7 - c;
+            }
+
+            // Get position string
+            const pos = files[cc] + ranks[rc];
+
+            // Get square element
+            const square = document.querySelector(`.square[data-pos="${pos}"]`);
+
+            // If this position should have a piece in the initial setup
+            if (pieces[r] && pieces[r][c]) {
+                createPiece(pieces[rc][cc], pos);
+            }
+        }
+    }
+
+    console.log("Board UI reset complete");
 }
+
 
 
 
@@ -637,24 +674,33 @@ function getAIMove() {
     console.log(positionCommand);
 }
 
-// Add this function to create and manage chess pieces
+// Improved setupPiecesSystem for initial game start
 function setupPiecesSystem() {
+    console.log("Setting up piece system");
+
     // Clear any existing pieces
     const existingPieces = document.querySelectorAll('.chess-piece');
     existingPieces.forEach(piece => piece.remove());
 
-    // Make all squares empty divs instead of text content
+    // Add chess-square class to all squares if needed
     squares.forEach(sq => {
         sq.classList.add('chess-square');
-        const piece = sq.textContent.trim();
+
+        // Get the current piece text if any
+        const pieceText = sq.textContent.trim();
+
+        // Clear the square text
         sq.textContent = '';
 
-        // If there was a piece here, create a piece element
-        if (piece && piece !== '.') {
-            createPiece(piece, sq.dataset.pos);
+        // If there was a piece, create a piece element
+        if (pieceText && pieceText !== '.') {
+            createPiece(pieceText, sq.dataset.pos);
         }
     });
+
+    console.log("Piece system setup complete");
 }
+
 
 // Function to create a piece element
 function createPiece(symbol, position) {
@@ -697,14 +743,14 @@ function animatePieceMove(fromPos, toPos, callback) {
     // Check if there's a piece to capture
     const capturedPiece = toSquare.querySelector('.chess-piece');
     if (capturedPiece) {
-        // Start the capture animation immediately but make it slower
-        capturedPiece.style.zIndex = '5'; // Lower z-index
+        // Start the capture animation
+        capturedPiece.style.zIndex = '5';
         capturedPiece.classList.add('captured');
 
         // Remove the captured piece after animation completes
         setTimeout(() => {
             capturedPiece.remove();
-        }, 0); // Match the capture animation duration
+        }, 300);
     }
 
     // Get the positions for animation
@@ -712,31 +758,47 @@ function animatePieceMove(fromPos, toPos, callback) {
     const toRect = toSquare.getBoundingClientRect();
 
     // Create a clone for animation
-    const clone = pieceElement.cloneNode(true);
+    const clone = document.createElement('div');
+    clone.className = 'piece-clone';
+    clone.textContent = pieceElement.textContent;
+    clone.dataset.symbol = pieceElement.dataset.symbol || pieceElement.textContent;
+
+    // Position the clone exactly where the original piece is
     clone.style.position = 'fixed';
-    clone.style.top = `${fromRect.top + fromRect.height * 0.05}px`; // Center vertically
-    clone.style.left = `${fromRect.left + fromRect.width * 0.05}px`; // Center horizontally
-    clone.style.width = `${fromRect.width * 0.9}px`; // 90% of square width
-    clone.style.height = `${fromRect.height * 0.9}px`; // 90% of square height
-    clone.style.zIndex = '30'; // Higher z-index than captured pieces
+    clone.style.top = `${fromRect.top}px`;
+    clone.style.left = `${fromRect.left}px`;
+    clone.style.width = `${fromRect.width}px`;
+    clone.style.height = `${fromRect.height}px`;
+    clone.style.fontSize = '50px';
+    clone.style.display = 'flex';
+    clone.style.justifyContent = 'center';
+    clone.style.alignItems = 'center';
+    clone.style.zIndex = '1000';
+    clone.style.transition = 'all 0.3s ease'; // Set duration in the element itself
+
+    // Add the clone to the body
     document.body.appendChild(clone);
 
-    // Remove the original piece from its square
+    // Remove the original piece
     pieceElement.remove();
 
-    // Animate the clone
-    setTimeout(() => {
-        clone.style.top = `${toRect.top + toRect.height * 0.05}px`; // Center vertically
-        clone.style.left = `${toRect.left + toRect.width * 0.05}px`; // Center horizontally
+    // Force a reflow to ensure the animation will work
+    void clone.offsetWidth;
 
-        // After animation completes, place the actual piece in the destination square
+    // Set the target position
+    setTimeout(() => {
+        clone.style.top = `${toRect.top}px`;
+        clone.style.left = `${toRect.left}px`;
+
+        // After animation completes, place the actual piece and remove the clone
         setTimeout(() => {
             clone.remove();
             createPiece(clone.dataset.symbol, toPos);
             if (callback) callback();
-        }, 700); // Match the transition duration in CSS
+        }, 350); // Slightly longer than the transition duration to ensure it completes
     }, 10);
 }
+
 // Function to handle castling animation
 function animateCastling(kingFrom, kingTo, callback) {
     // Determine rook positions based on the castling type
@@ -766,10 +828,7 @@ function animateCastling(kingFrom, kingTo, callback) {
 
     // First animate the king
     animatePieceMove(kingFrom, kingTo, () => {
-        // Then animate the rook, with a small delay for visual clarity
-        setTimeout(() => {
-            animatePieceMove(rookFrom, rookTo, callback);
-        }, 100); // Small delay before rook moves
+        // Then animate the rook
+        animatePieceMove(rookFrom, rookTo, callback);
     });
-
 }
