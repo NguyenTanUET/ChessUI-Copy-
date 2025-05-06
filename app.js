@@ -7,6 +7,7 @@ const { AlgebraicToMove }        = require("./game/bitboard/conversions");
 const { PrintGameState }            = require("./game/engine/game");
 const { spawn }                  = require('child_process');
 const path                       = require('path');
+const { CheckEndGame, DisplayGameResult } = require("./match"); // Adjust path as needed
 
 StartChessEngine();
 
@@ -25,7 +26,7 @@ let game = {
 };
 let moveHistory = [];
 let moveList = GenerateMoves(game.GameState);
-console.log('Move list:' + moveList);
+console.log('Move list:' + game.GameState.LegalMoveList);
 console.log('game.GameState.SideToMove: ' + game.GameState.SideToMove);
 
 // Khởi tạo engine
@@ -54,19 +55,12 @@ const pieces = {
     1: Array(8).fill('♟'),
     6: Array(8).fill('♙'),
     7: ['♖','♘','♗','♕','♔','♗','♘','♖']
-
-    // 0: ['♖','♘','♗','♔','♕','♗','♘','♖'],
-    // 1: Array(8).fill('♙'),
-    // 6: Array(8).fill('♟'),
-    // 7: ['♜','♞','♝','♚','♛','♝','♞','♜']
 };
 
 const files = ['a','b','c','d','e','f','g','h'];
 const ranks = ['8','7','6','5','4','3','2','1'];
 
-// const files = ['h','g','f','e','d','c','b','a'];
-// // const ranks = ['1','2','3','4','5','6','7','8'];
-// const ranks = ['8','7','6','5','4','3','2','1'];
+
 
 const boardEl = document.getElementById('chessboard');
 
@@ -90,6 +84,8 @@ for (let r = 0; r < 8; r++) {
         boardEl.appendChild(sq);
     }
 }
+// Add this after the board is created
+
 console.log('game.GameState.SideToMove: ' + game.GameState.SideToMove);
 if (playerColor === 1) {
     console.log('bot called');
@@ -97,6 +93,7 @@ if (playerColor === 1) {
 }
 const squares = document.querySelectorAll('.square');
 let selectedPos = null;
+setupPiecesSystem();
 
 // 2. Xóa highlight cũ
 function clearHighlights() {
@@ -113,27 +110,24 @@ function showHighlights(pos) {
     });
 }
 
+// Modify movePiece function to use animation
 function movePiece(fromPos, toPos) {
-
+    // Check for pawn promotion
     const fromSq = document.querySelector(`.square[data-pos="${fromPos}"]`);
-    const toSq = document.querySelector(`.square[data-pos="${toPos}"]`);
+    const pieceElement = fromSq.querySelector('.chess-piece');
 
-    if (!fromSq || !toSq) return;
+    if (!pieceElement) return;
 
-    // Check if this could be a pawn promotion (white pawn reaching 8th rank)
-    console.log('Player fromSq.textContent:' + fromSq.textContent);
-    console.log('is Player controlling a pawn:' + (fromSq.textContent === '♙'));
+    const pieceSymbol = pieceElement.textContent;
 
-    // Fixed here - use the correct white pawn character (♙)
-    let isPotentialPromotion
-    if (playerColor === 1)
-    {
-        isPotentialPromotion = fromSq.textContent === '♟' && toPos.charAt(1) === '8';
+    // Check for promotion
+    let isPotentialPromotion;
+    if (playerColor === 1) {
+        isPotentialPromotion = pieceSymbol === '♟' && toPos.charAt(1) === '1';
     } else {
-        isPotentialPromotion = fromSq.textContent === '♙' && toPos.charAt(1) === '8';
+        isPotentialPromotion = pieceSymbol === '♙' && toPos.charAt(1) === '8';
     }
 
-    // If it's a potential promotion, show options to the player
     if (isPotentialPromotion) {
         showPromotionOptions(fromPos, toPos);
         return;
@@ -144,57 +138,79 @@ function movePiece(fromPos, toPos) {
     moveHistory.push(move);
 
     let moveConverted = AlgebraicToMove(move, GenerateMoves(game.GameState));
-
-    // Check for en passant capture
     const moveFlag = GetMoveFlag(moveConverted);
-    const isEnPassant = moveFlag === MoveFlags.ep_capture;
 
-    // Determine captured pawn position for en passant
-    let capturedPawnPos = null;
-    if (isEnPassant) {
-        // For white capturing black pawn (moving up)
-        if (fromPos.charAt(1) === '5' && toPos.charAt(1) === '6') {
-            capturedPawnPos = toPos.charAt(0) + '5'; // Black pawn is on rank 5
-        }
-    }
+    // Check if this is castling
+    const isCastling = (moveFlag === MoveFlags.king_castle || moveFlag === MoveFlags.queen_castle);
 
-    // Save the piece before executing the move
-    const pieceToBeMoved = fromSq.textContent;
+    // Save game state before animation
+    const currentGameState = structuredClone(game.GameState);
 
     // Update game state
     game.GameState = ExecuteMove(game.GameState, moveConverted);
 
-    // Handle castling
-    const isCastling = handleCastling(fromPos, toPos);
-
-    if (!isCastling) {
-        // Normal move
-        toSq.textContent = pieceToBeMoved;
-        fromSq.textContent = '';
-
-        // Remove captured pawn in en passant
-        if (isEnPassant && capturedPawnPos) {
+    // Animate the move
+    if (isCastling) {
+        animateCastling(fromPos, toPos, () => {
+            afterMoveComplete();
+        });
+    } else {
+        // Handle en passant capture
+        if (moveFlag === MoveFlags.ep_capture) {
+            const capturedPawnPos = toPos.charAt(0) + (playerColor === 0 ? '5' : '3');
             const capturedPawnSq = document.querySelector(`.square[data-pos="${capturedPawnPos}"]`);
-            if (capturedPawnSq) {
-                capturedPawnSq.textContent = '';
+            const capturedPawn = capturedPawnSq.querySelector('.chess-piece');
+
+            if (capturedPawn) {
+                capturedPawn.classList.add('captured');
+                setTimeout(() => {
+                    capturedPawn.remove();
+                }, 0);
             }
         }
+
+        animatePieceMove(fromPos, toPos, () => {
+            afterMoveComplete();
+        });
     }
 
-    PrintGameState(game.GameState);
+    function afterMoveComplete() {
+        PrintGameState(game.GameState);
 
-    // Reset selection and highlight
-    selectedPos = null;
-    clearHighlights();
+        // Reset selection and highlight
+        selectedPos = null;
+        clearHighlights();
 
-    // After player's move, call AI
-    getAIMove();
+        // Check for game end
+        const legalMoves = GenerateMoves(game.GameState);
+        console.log(`Checking end game - Legal moves count: ${legalMoves.count}`);
+        const endGameCode = CheckEndGame(game.GameState, legalMoves);
+        console.log(`End game code: ${endGameCode}`);
+        const gameResult = DisplayGameResult(endGameCode, game.GameState.SideToMove);
+        console.log(`Game result: ${JSON.stringify(gameResult)}`);
+
+        if (gameResult.isGameOver) {
+            console.log("Game is over! Showing result...");
+            showGameResult(gameResult);
+            return;
+        }
+
+        // Call AI move if game not over
+        getAIMove();
+    }
+}
+
+// Function to reset the board UI
+function resetBoard() {
+    // Setup the board with animated pieces
+    setupPiecesSystem();
 }
 
 
 
 
-// Add a promotion dialog function
+
+// Replace your existing showPromotionOptions function with this one
 function showPromotionOptions(fromPos, toPos) {
     // Create promotion dialog if it doesn't exist
     let promotionDialog = document.getElementById('promotion-dialog');
@@ -217,15 +233,25 @@ function showPromotionOptions(fromPos, toPos) {
         promotionDialog.innerHTML = ''; // Clear existing content
         promotionDialog.style.display = 'flex'; // Make visible
     }
-    // Add promotion options (for white pieces)
-    let pieces = [
-        { type: 'q', symbol: '♕', name: 'Queen' },   // White Queen
-        { type: 'r', symbol: '♖', name: 'Rook' },    // White Rook
-        { type: 'b', symbol: '♗', name: 'Bishop' },  // White Bishop
-        { type: 'n', symbol: '♘', name: 'Knight' }   // White Knight
-    ];
 
-    pieces.forEach(piece => {
+    let promotionPieces = [];
+    if (playerColor === 0) {
+        promotionPieces = [
+            { type: 'q', symbol: '♕', name: 'Queen' },
+            { type: 'r', symbol: '♖', name: 'Rook' },
+            { type: 'b', symbol: '♗', name: 'Bishop' },
+            { type: 'n', symbol: '♘', name: 'Knight' }
+        ];
+    } else {
+        promotionPieces = [
+            { type: 'q', symbol: '♛', name: 'Queen' },
+            { type: 'r', symbol: '♜', name: 'Rook' },
+            { type: 'b', symbol: '♝', name: 'Bishop' },
+            { type: 'n', symbol: '♞', name: 'Knight' }
+        ];
+    }
+
+    promotionPieces.forEach(piece => {
         const pieceElement = document.createElement('div');
         pieceElement.style.width = '60px';
         pieceElement.style.height = '60px';
@@ -254,23 +280,54 @@ function showPromotionOptions(fromPos, toPos) {
             // Execute the move in the engine
             game.GameState = ExecuteMove(game.GameState, moveConverted);
 
-            // Update the board visually
-            const fromSq = document.querySelector(`.square[data-pos="${fromPos}"]`);
-            const toSq = document.querySelector(`.square[data-pos="${toPos}"]`);
+            // Animate the pawn moving first
+            animatePieceMove(fromPos, toPos, () => {
+                // Then replace with promoted piece
+                const toSquare = document.querySelector(`.square[data-pos="${toPos}"]`);
+                const pawnElement = toSquare.querySelector('.chess-piece');
 
-            if (fromSq && toSq) {
-                toSq.textContent = piece.symbol;
-                fromSq.textContent = '';
-            }
+                if (pawnElement) {
+                    // Scale animation for promotion
+                    pawnElement.style.transition = 'transform 0.3s ease';
+                    pawnElement.style.transform = 'scale(0.5)';
 
-            PrintGameState(game.GameState);
+                    setTimeout(() => {
+                        pawnElement.textContent = piece.symbol;
+                        pawnElement.dataset.symbol = piece.symbol;
+                        pawnElement.style.transform = 'scale(1)';
 
-            // Reset selection and highlight
-            selectedPos = null;
-            clearHighlights();
+                        // After promotion animation
+                        PrintGameState(game.GameState);
 
-            // After player's move, call AI
-            getAIMove();
+                        // Reset selection and highlight
+                        selectedPos = null;
+                        clearHighlights();
+
+                        // Check for game end
+                        const legalMoves = GenerateMoves(game.GameState);
+                        console.log(`Checking end game - Legal moves count: ${legalMoves.count}`);
+                        const endGameCode = CheckEndGame(game.GameState, legalMoves);
+                        console.log(`End game code: ${endGameCode}`);
+                        const gameResult = DisplayGameResult(endGameCode, game.GameState.SideToMove);
+                        console.log(`Game result: ${JSON.stringify(gameResult)}`);
+
+                        if (gameResult.isGameOver) {
+                            console.log("Game is over! Showing result...");
+                            showGameResult(gameResult);
+                            return;
+                        }
+
+                        // After player's move, call AI
+                        getAIMove();
+                    }, 700);
+                } else {
+                    // If pawn element disappeared for some reason
+                    PrintGameState(game.GameState);
+                    selectedPos = null;
+                    clearHighlights();
+                    getAIMove();
+                }
+            });
         });
 
         pieceElement.addEventListener('mouseover', () => {
@@ -286,106 +343,202 @@ function showPromotionOptions(fromPos, toPos) {
 }
 
 
-
-// Thực hiện nước đi của AI
+// Replace your existing executeAIMove function with this one
 function executeAIMove(move) {
     console.log('Bot moves:', move);
-    console.log('Bot moves: length:', move.length); // Debug log
-    
+    console.log('Bot moves: length:', move.length);
+
     // Trim any whitespace from the move string
     move = move.trim();
-    
+
     // Extract positions and promotion info
     const fromPos = move.substring(0, 2);
     const toPos = move.substring(2, 4);
     const promotionPiece = move.length > 4 ? move.charAt(4) : null;
-    
+
     // Get the DOM elements
     const fromSq = document.querySelector(`.square[data-pos="${fromPos}"]`);
-    const toSq = document.querySelector(`.square[data-pos="${toPos}"]`);
-    
-    if (!fromSq || !toSq) {
-        console.error('Could not find squares:', fromPos, toPos);
+    const pieceElement = fromSq ? fromSq.querySelector('.chess-piece') : null;
+
+    if (!fromSq || !pieceElement) {
+        console.error('Could not find piece to move:', fromPos);
         return;
     }
 
-    // Cập nhật lịch sử nước đi
+    // Update move history
     const moveToRecord = promotionPiece ? fromPos + toPos + promotionPiece : fromPos + toPos;
     moveHistory.push(moveToRecord);
-    
+
     // Convert the move to internal format
     let convertedMove = AlgebraicToMove(moveToRecord, GenerateMoves(game.GameState));
     const moveFlag = GetMoveFlag(convertedMove);
-    
-    // Check if this is an en passant capture
-    const isEnPassant = moveFlag === MoveFlags.ep_capture;
-    
-    // Determine captured pawn position for en passant
-    let capturedPawnPos = null;
-    if (isEnPassant) {
-        // For black capturing white pawn (moving down)
-        if (fromPos.charAt(1) === '4' && toPos.charAt(1) === '3') {
-            capturedPawnPos = toPos.charAt(0) + '4'; // White pawn is on rank 4
-        }
-        // For white capturing black pawn (moving up)
-        else if (fromPos.charAt(1) === '5' && toPos.charAt(1) === '6') {
-            capturedPawnPos = toPos.charAt(0) + '5'; // Black pawn is on rank 5
-        }
-    }
-    
-    // Save the piece character before executing the move
-    const pieceToBeMoved = fromSq.textContent;
-    
+
+    // Check if this is castling
+    const isCastling = (moveFlag === MoveFlags.king_castle || moveFlag === MoveFlags.queen_castle);
+
     // Update game state
     game.GameState = ExecuteMove(game.GameState, convertedMove);
-    
-    // Xử lý castling
-    const isCastling = handleCastling(fromPos, toPos);
-    
-    if (!isCastling) {
-        if (promotionPiece) {
-            // This is a promotion move
-            let promotedPieceChar;
-            
-            // For black promoting (since AI is playing as black)
-            switch (promotionPiece) {
-                case 'q':
-                    promotedPieceChar = '♛'; // Black queen
-                    break;
-                case 'r':
-                    promotedPieceChar = '♜'; // Black rook
-                    break;
-                case 'b':
-                    promotedPieceChar = '♝'; // Black bishop
-                    break;
-                case 'n':
-                    promotedPieceChar = '♞'; // Black knight
-                    break;
-                default:
-                    promotedPieceChar = '♛'; // Default to black queen
+
+    // Animate the move based on its type
+    if (isCastling) {
+        animateCastling(fromPos, toPos, () => {
+            afterMoveComplete();
+        });
+    } else if (promotionPiece) {
+        // For promotion, first move the pawn
+        animatePieceMove(fromPos, toPos, () => {
+            // Then replace it with the promoted piece
+            const toSquare = document.querySelector(`.square[data-pos="${toPos}"]`);
+            const pawnElement = toSquare.querySelector('.chess-piece');
+
+            if (pawnElement) {
+                let promotedPieceChar;
+                if (playerColor === 0) {
+                    // For black AI promoting
+                    switch (promotionPiece) {
+                        case 'q': promotedPieceChar = '♛'; break;
+                        case 'r': promotedPieceChar = '♜'; break;
+                        case 'b': promotedPieceChar = '♝'; break;
+                        case 'n': promotedPieceChar = '♞'; break;
+                        default: promotedPieceChar = '♛'; break;
+                    }
+                } else {
+                    // For white AI promoting
+                    switch (promotionPiece) {
+                        case 'q': promotedPieceChar = '♕'; break;
+                        case 'r': promotedPieceChar = '♖'; break;
+                        case 'b': promotedPieceChar = '♗'; break;
+                        case 'n': promotedPieceChar = '♘'; break;
+                        default: promotedPieceChar = '♕'; break;
+                    }
+                }
+
+                // Scale animation for promotion
+                pawnElement.style.transition = 'transform 0.3s ease';
+                pawnElement.style.transform = 'scale(0.5)';
+
+                setTimeout(() => {
+                    pawnElement.textContent = promotedPieceChar;
+                    pawnElement.dataset.symbol = promotedPieceChar;
+                    pawnElement.style.transform = 'scale(1)';
+
+                    afterMoveComplete();
+                }, 700);
+            } else {
+                afterMoveComplete();
             }
-            
-            // Update the board visually
-            toSq.textContent = promotedPieceChar;
-            fromSq.textContent = '';
-        } else {
-            // Normal move - simply move the piece
-            toSq.textContent = pieceToBeMoved;
-            fromSq.textContent = '';
-        }
-        
-        // Remove captured pawn in en passant
-        if (isEnPassant && capturedPawnPos) {
+        });
+    } else {
+        // Handle en passant capture
+        if (moveFlag === MoveFlags.ep_capture) {
+            const capturedPawnPos = toPos.charAt(0) + (playerColor === 1 ? '5' : '3');
             const capturedPawnSq = document.querySelector(`.square[data-pos="${capturedPawnPos}"]`);
-            if (capturedPawnSq) {
-                capturedPawnSq.textContent = '';
+            const capturedPawn = capturedPawnSq ? capturedPawnSq.querySelector('.chess-piece') : null;
+
+            if (capturedPawn) {
+                capturedPawn.classList.add('captured');
+                setTimeout(() => {
+                    capturedPawn.remove();
+                }, 0);
             }
+        }
+
+        // For regular moves
+        animatePieceMove(fromPos, toPos, () => {
+            afterMoveComplete();
+        });
+    }
+
+    function afterMoveComplete() {
+        PrintGameState(game.GameState);
+
+        // Check for game end
+        const legalMoves = GenerateMoves(game.GameState);
+        console.log(`Checking end game - Legal moves count: ${legalMoves.count}`);
+        const endGameCode = CheckEndGame(game.GameState, legalMoves);
+        console.log(`End game code: ${endGameCode}`);
+        const gameResult = DisplayGameResult(endGameCode, game.GameState.SideToMove);
+        console.log(`Game result: ${JSON.stringify(gameResult)}`);
+
+        if (gameResult.isGameOver) {
+            console.log("Game is over! Showing result...");
+            showGameResult(gameResult);
         }
     }
-    
-    PrintGameState(game.GameState);
 }
 
+// Add this function to your app.js
+function showGameResult(gameResult) {
+    console.log("Showing game result:", gameResult);
+
+    // Create modal container if it doesn't exist
+    let resultModal = document.getElementById('game-result-modal');
+    if (!resultModal) {
+        resultModal = document.createElement('div');
+        resultModal.id = 'game-result-modal';
+
+        // Style the modal
+        resultModal.style.position = 'fixed';
+        resultModal.style.top = '0';
+        resultModal.style.left = '0';
+        resultModal.style.width = '100%';
+        resultModal.style.height = '100%';
+        resultModal.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        resultModal.style.display = 'flex';
+        resultModal.style.justifyContent = 'center';
+        resultModal.style.alignItems = 'center';
+        resultModal.style.zIndex = '1000';
+
+        document.body.appendChild(resultModal);
+    } else {
+        // Make sure it's visible
+        resultModal.style.display = 'flex';
+    }
+
+    // Create or update modal content
+    resultModal.innerHTML = `
+        <div style="background-color: white; padding: 30px; border-radius: 10px; text-align: center; max-width: 400px;">
+            <h2 style="margin-top: 0; color: #333;">${gameResult.message}</h2>
+            <p style="font-size: 18px; margin: 15px 0;">Kết quả: <strong>${gameResult.result}</strong></p>
+            <button id="new-game-button" style="padding: 10px 20px; font-size: 16px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">Ván mới</button>
+        </div>
+    `;
+
+    // Add event listener to the new game button
+    document.getElementById('new-game-button').addEventListener('click', () => {
+        // Hide the modal
+        resultModal.style.display = 'none';
+
+        // Reset the game
+        resetGame();
+    });
+}
+// Function to reset the game
+function resetGame() {
+    // Reset game state
+    game = {
+        ...NewGame(FENStart),
+        EnPassantSquare: -1,
+        CastlingRight: 0b1111,
+        HalfMoves: 0,
+        FullMoves: 1,
+        PastPositions: [0n],
+        PinnedBoards: [0n, 0n],
+        SideToMove: 0
+    };
+    moveHistory = [];
+    moveList = GenerateMoves(game.GameState);
+
+    // Reset the board
+    resetBoard();
+
+    console.log("Game has been reset");
+
+    // If player is black, let AI make first move
+    if (playerColor === 1) {
+        getAIMove();
+    }
+}
 
 
 // Hàm xử lý castling
@@ -463,6 +616,7 @@ function getPossibleMoves(fromPos) {
     // Lấy danh sách nước đi hợp lệ dựa trên trạng thái game hiện tại
     const list = GenerateMoves(game.GameState);
     const result = [];
+    console.log('legal move: ' + game.GameState.LegalMoveList);
 
     for (let i = 0; i < list.count; i++) {
         const mv = GenMoveString(list.moves[i]);
@@ -481,4 +635,141 @@ function getAIMove() {
     sendCommand(positionCommand);
     sendCommand('go depth 5');
     console.log(positionCommand);
+}
+
+// Add this function to create and manage chess pieces
+function setupPiecesSystem() {
+    // Clear any existing pieces
+    const existingPieces = document.querySelectorAll('.chess-piece');
+    existingPieces.forEach(piece => piece.remove());
+
+    // Make all squares empty divs instead of text content
+    squares.forEach(sq => {
+        sq.classList.add('chess-square');
+        const piece = sq.textContent.trim();
+        sq.textContent = '';
+
+        // If there was a piece here, create a piece element
+        if (piece && piece !== '.') {
+            createPiece(piece, sq.dataset.pos);
+        }
+    });
+}
+
+// Function to create a piece element
+function createPiece(symbol, position) {
+    const pieceElement = document.createElement('div');
+    pieceElement.className = 'chess-piece';
+    pieceElement.textContent = symbol;
+    pieceElement.dataset.symbol = symbol;
+    pieceElement.dataset.position = position;
+
+    // Make pieces larger and centered
+    pieceElement.style.fontSize = '50px'; // Larger font size
+    pieceElement.style.display = 'flex';
+    pieceElement.style.justifyContent = 'center';
+    pieceElement.style.alignItems = 'center';
+    pieceElement.style.width = '90%'; // Use less than 100% to center in square
+    pieceElement.style.height = '90%';
+    pieceElement.style.margin = 'auto'; // Center in square
+
+    // Find the square and place the piece in it
+    const square = document.querySelector(`.square[data-pos="${position}"]`);
+    if (square) {
+        square.appendChild(pieceElement);
+    }
+
+    return pieceElement;
+}
+
+// Function to move a piece with animation
+function animatePieceMove(fromPos, toPos, callback) {
+    const fromSquare = document.querySelector(`.square[data-pos="${fromPos}"]`);
+    const toSquare = document.querySelector(`.square[data-pos="${toPos}"]`);
+    const pieceElement = fromSquare.querySelector('.chess-piece');
+
+    if (!fromSquare || !toSquare || !pieceElement) {
+        console.error('Missing elements for animation', fromPos, toPos);
+        if (callback) callback();
+        return;
+    }
+
+    // Check if there's a piece to capture
+    const capturedPiece = toSquare.querySelector('.chess-piece');
+    if (capturedPiece) {
+        // Start the capture animation immediately but make it slower
+        capturedPiece.style.zIndex = '5'; // Lower z-index
+        capturedPiece.classList.add('captured');
+
+        // Remove the captured piece after animation completes
+        setTimeout(() => {
+            capturedPiece.remove();
+        }, 0); // Match the capture animation duration
+    }
+
+    // Get the positions for animation
+    const fromRect = fromSquare.getBoundingClientRect();
+    const toRect = toSquare.getBoundingClientRect();
+
+    // Create a clone for animation
+    const clone = pieceElement.cloneNode(true);
+    clone.style.position = 'fixed';
+    clone.style.top = `${fromRect.top + fromRect.height * 0.05}px`; // Center vertically
+    clone.style.left = `${fromRect.left + fromRect.width * 0.05}px`; // Center horizontally
+    clone.style.width = `${fromRect.width * 0.9}px`; // 90% of square width
+    clone.style.height = `${fromRect.height * 0.9}px`; // 90% of square height
+    clone.style.zIndex = '30'; // Higher z-index than captured pieces
+    document.body.appendChild(clone);
+
+    // Remove the original piece from its square
+    pieceElement.remove();
+
+    // Animate the clone
+    setTimeout(() => {
+        clone.style.top = `${toRect.top + toRect.height * 0.05}px`; // Center vertically
+        clone.style.left = `${toRect.left + toRect.width * 0.05}px`; // Center horizontally
+
+        // After animation completes, place the actual piece in the destination square
+        setTimeout(() => {
+            clone.remove();
+            createPiece(clone.dataset.symbol, toPos);
+            if (callback) callback();
+        }, 700); // Match the transition duration in CSS
+    }, 10);
+}
+// Function to handle castling animation
+function animateCastling(kingFrom, kingTo, callback) {
+    // Determine rook positions based on the castling type
+    let rookFrom, rookTo;
+
+    if (kingFrom === 'e1' && kingTo === 'g1') {
+        // White kingside
+        rookFrom = 'h1';
+        rookTo = 'f1';
+    } else if (kingFrom === 'e1' && kingTo === 'c1') {
+        // White queenside
+        rookFrom = 'a1';
+        rookTo = 'd1';
+    } else if (kingFrom === 'e8' && kingTo === 'g8') {
+        // Black kingside
+        rookFrom = 'h8';
+        rookTo = 'f8';
+    } else if (kingFrom === 'e8' && kingTo === 'c8') {
+        // Black queenside
+        rookFrom = 'a8';
+        rookTo = 'd8';
+    } else {
+        // Not castling
+        if (callback) callback();
+        return;
+    }
+
+    // First animate the king
+    animatePieceMove(kingFrom, kingTo, () => {
+        // Then animate the rook, with a small delay for visual clarity
+        setTimeout(() => {
+            animatePieceMove(rookFrom, rookTo, callback);
+        }, 100); // Small delay before rook moves
+    });
+
 }
