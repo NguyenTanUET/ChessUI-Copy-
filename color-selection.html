@@ -1,0 +1,102 @@
+<!-- color-selection.html -->
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chọn Quân Cờ</title>
+    <style>
+        body {
+            background-color: #333;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+        }
+        .selection-container {
+            display: flex;
+            justify-content: space-around;
+            width: 80%;
+            max-width: 600px;
+        }
+        .color-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.3s, background-color 0.3s;
+        }
+        .color-option:hover {
+            transform: scale(1.05);
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .piece-symbol {
+            font-size: 5rem;
+            margin-bottom: 15px;
+        }
+        .white-piece {
+            color: #fff;
+        }
+        .black-piece {
+            color: #000;
+            text-shadow: 0 0 3px #fff;
+        }
+        .option-label {
+            font-size: 1.5rem;
+        }
+        .back-btn {
+            margin-top: 40px;
+            padding: 10px 20px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+<h1>Chọn Quân Cờ</h1>
+
+<div class="selection-container">
+    <div class="color-option" id="whiteOption">
+        <div class="piece-symbol white-piece">♔</div>
+        <div class="option-label">Quân Trắng</div>
+    </div>
+
+    <div class="color-option" id="blackOption">
+        <div class="piece-symbol black-piece">♚</div>
+        <div class="option-label">Quân Đen</div>
+    </div>
+</div>
+
+<button class="back-btn" id="backBtn">Quay lại</button>
+
+<script>
+    document.getElementById('whiteOption').onclick = () => {
+        localStorage.setItem('playerColor', '0'); // 0 là trắng
+        window.location.href = 'game.html';
+    };
+
+    document.getElementById('blackOption').onclick = () => {
+        localStorage.setItem('playerColor', '1'); // 1 là đen
+        window.location.href = 'game.html';
+    };
+
+    document.getElementById('backBtn').onclick = () => {
+        window.location.href = 'chess.html';
+    };
+</script>
+</body>
+</html>

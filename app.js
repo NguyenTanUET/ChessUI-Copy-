@@ -10,6 +10,9 @@ const path                       = require('path');
 
 StartChessEngine();
 
+const playerColor = parseInt(localStorage.getItem('playerColor') || '0');
+console.log("Người chơi chọn quân: " + (playerColor === 0 ? "Trắng" : "Đen"));
+
 let game = {
     ...NewGame(FENStart),
     EnPassantSquare: -1,
@@ -22,7 +25,8 @@ let game = {
 };
 let moveHistory = [];
 let moveList = GenerateMoves(game.GameState);
-console.log(moveList);
+console.log('Move list:' + moveList);
+console.log('game.GameState.SideToMove: ' + game.GameState.SideToMove);
 
 // Khởi tạo engine
 const enginePath = path.join(__dirname, 'CSEngine.exe');
@@ -50,10 +54,19 @@ const pieces = {
     1: Array(8).fill('♟'),
     6: Array(8).fill('♙'),
     7: ['♖','♘','♗','♕','♔','♗','♘','♖']
+
+    // 0: ['♖','♘','♗','♔','♕','♗','♘','♖'],
+    // 1: Array(8).fill('♙'),
+    // 6: Array(8).fill('♟'),
+    // 7: ['♜','♞','♝','♚','♛','♝','♞','♜']
 };
 
 const files = ['a','b','c','d','e','f','g','h'];
 const ranks = ['8','7','6','5','4','3','2','1'];
+
+// const files = ['h','g','f','e','d','c','b','a'];
+// // const ranks = ['1','2','3','4','5','6','7','8'];
+// const ranks = ['8','7','6','5','4','3','2','1'];
 
 const boardEl = document.getElementById('chessboard');
 
@@ -61,16 +74,27 @@ const boardEl = document.getElementById('chessboard');
 for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
         const sq = document.createElement('div');
-        sq.classList.add('square', (r + c) % 2 === 0 ? 'white' : 'black');
-        const pos = files[c] + ranks[r];
-        sq.dataset.pos = pos;
+        sq.classList.add('square', (r + c) % 2 === 0? 'white' : 'black');
+        let rc = r
+        let cc = c
+        if (playerColor === 1) {
+            rc = 7 - r;
+            cc = 7 - c;
+        }
+        const pos = files[cc] + ranks[rc];
+        // sq.dataset.pos = String(64 - Number(pos));
+        sq.dataset.pos = (pos);
         if (pieces[r]) {
-            sq.textContent = pieces[r][c];
+            sq.textContent = pieces[rc][cc];
         }
         boardEl.appendChild(sq);
     }
 }
-
+console.log('game.GameState.SideToMove: ' + game.GameState.SideToMove);
+if (playerColor === 1) {
+    console.log('bot called');
+    getAIMove();
+}
 const squares = document.querySelectorAll('.square');
 let selectedPos = null;
 
@@ -90,10 +114,6 @@ function showHighlights(pos) {
 }
 
 function movePiece(fromPos, toPos) {
-    if (game.GameState.SideToMove !== 0) {
-        console.log('Not white\'s turn yet!');
-        return;
-    }
 
     const fromSq = document.querySelector(`.square[data-pos="${fromPos}"]`);
     const toSq = document.querySelector(`.square[data-pos="${toPos}"]`);
@@ -105,7 +125,13 @@ function movePiece(fromPos, toPos) {
     console.log('is Player controlling a pawn:' + (fromSq.textContent === '♙'));
 
     // Fixed here - use the correct white pawn character (♙)
-    const isPotentialPromotion = fromSq.textContent === '♙' && toPos.charAt(1) === '8';
+    let isPotentialPromotion
+    if (playerColor === 1)
+    {
+        isPotentialPromotion = fromSq.textContent === '♟' && toPos.charAt(1) === '8';
+    } else {
+        isPotentialPromotion = fromSq.textContent === '♙' && toPos.charAt(1) === '8';
+    }
 
     // If it's a potential promotion, show options to the player
     if (isPotentialPromotion) {
@@ -191,9 +217,8 @@ function showPromotionOptions(fromPos, toPos) {
         promotionDialog.innerHTML = ''; // Clear existing content
         promotionDialog.style.display = 'flex'; // Make visible
     }
-
     // Add promotion options (for white pieces)
-    const pieces = [
+    let pieces = [
         { type: 'q', symbol: '♕', name: 'Queen' },   // White Queen
         { type: 'r', symbol: '♖', name: 'Rook' },    // White Rook
         { type: 'b', symbol: '♗', name: 'Bishop' },  // White Bishop
@@ -417,6 +442,7 @@ squares.forEach(sq => {
         const pos = sq.dataset.pos;
 
         if (selectedPos && sq.classList.contains('highlight')) {
+            console.log('selectedPos: ' + selectedPos);
             movePiece(selectedPos, pos);
             return;
         }
@@ -449,10 +475,6 @@ function getPossibleMoves(fromPos) {
 
 // Hàm gọi engine để lấy nước đi của đen
 function getAIMove() {
-    if (game.GameState.SideToMove !== 1) {
-        console.log('Not black\'s turn yet!');
-        return;
-    }
     const positionCommand = 'position startpos moves ' + moveHistory
         .map(move => move.trim())  // Remove any leading/trailing whitespace
         .join(' ');
