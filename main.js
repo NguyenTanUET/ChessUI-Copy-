@@ -22,7 +22,7 @@ function createWindow () {
        height: 600,
      });*/
     win.show();
-    win.loadFile('chess.html'); // Tải file HTML
+    win.loadFile('MainMenu.html'); // Tải file HTML
     //child.loadFile('child.html')
     win.webContents.openDevTools();
     console.warn("electron is running"); // In ra khi cửa sổ được tạo

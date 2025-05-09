@@ -3,9 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CheckEndGame = CheckEndGame;
 exports.DisplayGameResult = DisplayGameResult;
 
-const bit_operations_1 = require("./game/bitboard/bit_operations");
-const bit_boards_1 = require("./game/bitboard/bit_boards");
-const {IsKingInCheck} = require("./game/moves/attacks");
+const bit_operations_1 = require("../game/bitboard/bit_operations");
+const bit_boards_1 = require("../game/bitboard/bit_boards");
+const {IsKingInCheck} = require("../game/moves/attacks");
 
 /**
  * Kiểm tra trạng thái kết thúc trò chơi
